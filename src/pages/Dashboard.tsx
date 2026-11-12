@@ -23,8 +23,6 @@ import {
   CartesianGrid,
   Cell,
   Legend,
-  Line,
-  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -61,7 +59,6 @@ interface ChartTooltipProps {
   label?: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const chartTooltip = ((props: ChartTooltipProps): ReactNode => {
   const { active, payload, label } = props;
   if (!active || !payload?.length) return null;
@@ -166,7 +163,7 @@ function StatusDistributionChart({ data, total }: StatusDistributionChartProps) 
             outerRadius={72}
             paddingAngle={2}
             dataKey="value"
-            label={({ name, value, percent }) => `${name} ${Math.round(percent * 100)}%`}
+            label={({ name, percent }) => `${name} ${Math.round(percent * 100)}%`}
             labelLine={false}
           >
             {data.map((_, index) => <Cell key={index} fill={data[index].color} />)}

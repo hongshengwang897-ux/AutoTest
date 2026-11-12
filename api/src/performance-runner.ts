@@ -2,11 +2,7 @@ import { all, get, insert, update, exec, createId, now } from "./data/db.js";
 import {
   renderTemplate,
   normalizeRepeatedVariablePath,
-  valueAtPath,
-  displayValue,
-  compare,
   getAssertionFailures,
-  type ApiAssertionDefinition,
 } from "./assertion-utils.js";
 import { deliverExecutionAlerts } from "./alert-delivery.js";
 import { closeProxyPool, createProxyPoolRuntime, nextProxy, type ProxyPoolRuntime } from "./proxy-pool.js";

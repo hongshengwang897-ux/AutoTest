@@ -18,6 +18,12 @@ dist-ssr
 # ZCode internal session plans
 .zcode/plans/
 
+# Runtime artifacts (SQLite DB, screenshots, source maps, packaged zip)
+api/data/
+api/*.png
+*.js.map
+public/downloads/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

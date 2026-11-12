@@ -25,7 +25,6 @@ router.get("/", (_req, res) => {
   );
 
   const passed = recentExecs.filter((e: Record<string, unknown>) => e.status === "success").length;
-  const failed = recentExecs.filter((e: Record<string, unknown>) => e.status === "failed").length;
   const passRate = recentExecs.length > 0 ? Math.round((passed / recentExecs.length) * 100) : 0;
 
   // 近 7 天趋势：一条按日 GROUP BY 取数，JS 组装补零

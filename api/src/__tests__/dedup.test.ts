@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { dedupBySelector, suggestName, buildSelector } from '../dedup.js'
-import type { DetectedElement, ElementType } from '../types.js'
+import type { DetectedElement } from '../types.js'
 
 describe('dedupBySelector', () => {
   it('should deduplicate elements by selector', () => {

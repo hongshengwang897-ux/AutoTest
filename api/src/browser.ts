@@ -1,4 +1,4 @@
-import { chromium, Browser, BrowserContext, Page } from "playwright";
+import { chromium, Browser } from "playwright";
 import { v4 as uuid } from "uuid";
 import type { AutoDetectSession, DetectedElement } from "./types.js";
 import { buildInjectionScript } from "./inject.js";

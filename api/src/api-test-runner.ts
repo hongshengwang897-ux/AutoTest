@@ -5,7 +5,6 @@ import {
   valueAtPath,
   displayValue,
   compare,
-  type ApiAssertionDefinition,
 } from "./assertion-utils.js";
 
 export interface KeyValueItem {

@@ -143,7 +143,7 @@ export default function Alerts() {
                   <input
                     type="checkbox"
                     checked={editForm.modules.includes(v)}
-                    onChange={(e) => setEditForm((p) => {
+                    onChange={() => setEditForm((p) => {
                       const has = p.modules.includes(v);
                       const next = has ? p.modules.filter((m) => m !== v) : [...p.modules, v];
                       // 至少保留一个模块，避免通道变成不生效
