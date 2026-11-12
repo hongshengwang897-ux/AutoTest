@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Thesis / writing materials (kept out of the code repo)
+论文/
+
+# ZCode internal session plans
+.zcode/plans/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
