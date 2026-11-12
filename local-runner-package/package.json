@@ -1,0 +1,15 @@
+{
+  "name": "autotest-local-runner",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "pixelmatch": "^7.2.0",
+    "playwright": "^1.52.0",
+    "pngjs": "^7.0.0",
+    "sharp": "^0.35.3",
+    "uuid": "^10.0.0"
+  }
+}

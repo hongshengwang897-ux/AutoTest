@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg: 243 246 250;
+    --color-bg-card: 255 255 255;
+    --color-bg-elevated: 232 238 246;
+    --color-accent: 37 99 235;
+    --color-accent-hover: 29 78 216;
+    --color-accent-light: 59 130 246;
+    --color-success: 5 150 105;
+    --color-warning: 217 119 6;
+    --color-danger: 220 38 38;
+    --color-border: 203 213 225;
+    --color-muted: 143 160 181;
+    --color-text: 23 32 51;
+    --color-text-secondary: 82 98 119;
+    --color-text-tertiary: 123 140 163;
+    --color-shadow: 148 163 184;
+  }
+
+  html.dark {
+    --color-bg: 11 16 24;
+    --color-bg-card: 18 25 36;
+    --color-bg-elevated: 27 36 50;
+    --color-accent: 59 130 246;
+    --color-accent-hover: 96 165 250;
+    --color-accent-light: 96 165 250;
+    --color-success: 16 185 129;
+    --color-warning: 245 158 11;
+    --color-danger: 248 113 113;
+    --color-border: 51 65 85;
+    --color-muted: 100 116 139;
+    --color-text: 226 232 240;
+    --color-text-secondary: 165 178 197;
+    --color-text-tertiary: 112 129 153;
+    --color-shadow: 0 0 0;
+  }
+
+  html {
+    color-scheme: light;
+    background: rgb(var(--color-bg));
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-bg text-text font-sans antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    transition: background-color 180ms ease, color 180ms ease;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-bg-card rounded-xl border border-border/70;
+    box-shadow: 0 1px 3px rgb(var(--color-shadow) / 0.28);
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply btn bg-accent text-white hover:bg-accent-hover shadow-md shadow-accent/15;
+  }
+
+  .btn-secondary {
+    @apply btn bg-bg-elevated text-text hover:bg-border border border-border/50;
+  }
+
+  .btn-danger {
+    @apply btn bg-danger/90 text-white hover:bg-danger;
+  }
+
+  .input {
+    @apply w-full px-3 py-2 bg-bg-elevated border border-border/60 rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-colors;
+  }
+
+  .tag {
+    @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium;
+  }
+}
