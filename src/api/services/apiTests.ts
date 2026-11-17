@@ -173,6 +173,26 @@ export const apiTestsService = {
   removeCollectionRun(id: string) {
     return del(API.apiTests.collectionRunDetail(id));
   },
+  /**
+   * 下载接口集合报告的 Allure 官方 HTML 报告（ZIP）。
+   * 返回 { ok, blob, filename, error }；blob 供前端保存，filename 从响应头解析。
+   */
+  async downloadCollectionRunAllure(id: string) {
+    const res = await fetch(API.apiTests.collectionRunAllure(id));
+    if (!res.ok) {
+      let error = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        error = body?.error || error;
+      } catch { /* 忽略解析失败 */ }
+      return { ok: false as const, blob: null, filename: "", error };
+    }
+    const disposition = res.headers.get("Content-Disposition") || "";
+    const filenameMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i) || disposition.match(/filename="?([^";]+)"?/i);
+    const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : "allure-report.zip";
+    const blob = await res.blob();
+    return { ok: true as const, blob, filename, error: "" };
+  },
   // 执行历史列表为瘦身数据，响应体/断言等重字段需按 id 拉详情
   getExecution(id: string) {
     return get<ApiTestExecution>(API.apiTests.execution(id));

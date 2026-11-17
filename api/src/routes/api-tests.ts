@@ -5,6 +5,7 @@ import { runApiTest } from "../api-test-runner.js";
 import { isPostmanEnvironment, parsePostmanCollection, parsePostmanEnvironment } from "../postman-import.js";
 import { exportToPostmanCollection, getCasesForExport } from "../postman-export.js";
 import { listApiCollections, queueApiCollectionRun } from "../api-collection-runner.js";
+import { buildCollectionRunAllureZip } from "../allure-exporter.js";
 
 const router = Router();
 
@@ -176,6 +177,27 @@ router.get("/collection-runs/:id", (req, res) => {
   const run = get("api_collection_runs", req.params.id);
   if (!run) { res.status(404).json({ error: "集合报告不存在" }); return; }
   res.json(toApiCollectionRun(run));
+});
+
+// GET /api/api-tests/collection-runs/:id/allure-report — 生成 Allure 官方 HTML 报告并下载 ZIP
+router.get("/collection-runs/:id/allure-report", (req, res) => {
+  const run = get("api_collection_runs", req.params.id);
+  if (!run) { res.status(404).json({ error: "集合报告不存在" }); return; }
+  try {
+    const zipBuffer = buildCollectionRunAllureZip(toApiCollectionRun(run));
+    const baseName = (run.collection_name || "collection").replace(/[\\/:*?"<>|]/g, "_");
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(`${baseName}-${run.id}-allure.zip`)}`);
+    res.send(zipBuffer);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // 区分 allure CLI 缺失与生成失败
+    if (/spawn|ENOENT|not found|不是内部或外部命令/i.test(message)) {
+      res.status(500).json({ error: "Allure 命令行不可用，请安装 allure（https://allurereport.org）后重试" });
+    } else {
+      res.status(500).json({ error: `Allure 报告生成失败：${message.slice(0, 300)}` });
+    }
+  }
 });
 
 router.delete("/collection-runs/:id", (req, res) => {

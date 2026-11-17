@@ -13,7 +13,9 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@types/adm-zip": "^0.5.8",
     "@types/pngjs": "^6.0.5",
+    "adm-zip": "^0.6.1",
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "node-cron": "^4.6.0",

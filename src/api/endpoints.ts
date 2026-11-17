@@ -88,6 +88,7 @@ export const API = {
     collectionRun: `${BASE}/api-tests/collections/run`,
     collectionRuns: `${BASE}/api-tests/collection-runs`,
     collectionRunDetail: (id: string) => `${BASE}/api-tests/collection-runs/${id}`,
+    collectionRunAllure: (id: string) => `${BASE}/api-tests/collection-runs/${id}/allure-report`,
   },
 
   performanceTests: {
