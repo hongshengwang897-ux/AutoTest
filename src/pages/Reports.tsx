@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Braces, ChevronDown, Clock, Download, Eye, FileText, Loader2, Search, X, FileJson, FileSpreadsheet } from "lucide-react";
 import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
 import StatusBadge from "@/components/StatusBadge";
 import { apiTestsService, executionsService } from "@/api/services";
@@ -31,7 +30,6 @@ export default function Reports() {
   const [pdfExporting, setPdfExporting] = useState(false);
   const [allureExporting, setAllureExporting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const reportRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const activeTab = searchParams.get("tab") === "api" ? "api" : "platform";
@@ -88,47 +86,92 @@ export default function Reports() {
     if (result.ok) setSelectedRun(result.data);
   };
 
-  const downloadApiReport = async (run: ApiCollectionRun) => {
-    const node = reportRef.current;
-    if (!node || pdfExporting) return;
+  const downloadApiReport = (run: ApiCollectionRun) => {
+    if (pdfExporting) return;
     setPdfExporting(true);
     try {
-      const canvas = await html2canvas(node, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        onclone: (doc) => {
-          // 模态卡片有 max-h/overflow-hidden，克隆时放开以完整捕获滚动内容
-          const card = doc.querySelector<HTMLElement>("[data-report-card]");
-          if (card) {
-            card.style.maxHeight = "none";
-            card.style.overflow = "visible";
-          }
-          const body = doc.querySelector<HTMLElement>("[data-report-body]");
-          if (body) {
-            body.style.overflow = "visible";
-            body.style.maxHeight = "none";
-          }
-        },
-      });
-      const imgData = canvas.toDataURL("image/jpeg", 0.95);
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 8;
-      const imgWidth = pageWidth - margin * 2;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = margin;
-      pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight - margin * 2;
-      // 内容超出单页时按页切分，避免表格被截断
-      while (heightLeft > 0) {
-        position -= pageHeight - margin * 2;
-        pdf.addPage();
-        pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight - margin * 2;
-      }
+      // 用 jsPDF 原生文本 API 逐行绘制表格，按行高换页，避免截图分页把表格行从中间切断
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();   // 297
+      const pageH = pdf.internal.pageSize.getHeight();  // 210
+      const margin = 10;
+      const contentW = pageW - margin * 2;
+      const colWidths = [10, 16, 44, 92, 16, 16, 16, 18, 59];
+      const sum = colWidths.reduce((a, b) => a + b, 0);
+      // 按可用宽度等比缩放列宽
+      const scale = contentW / sum;
+      const widths = colWidths.map((w) => w * scale);
+      const rowH = 7;
+      const headerH = 9;
+      const colX: number[] = [];
+      let x = margin;
+      for (const w of widths) { colX.push(x); x += w; }
+      // 自维护 y 游标（不依赖 getY/setY，Node 与浏览器行为一致）
+      let cursorY = 28;
+
+      const drawHeader = () => {
+        pdf.setFillColor(232, 238, 246);
+        pdf.rect(margin, cursorY, contentW, headerH, "F");
+        pdf.setFontSize(8);
+        pdf.setTextColor(60, 60, 60);
+        const header = ["序号", "方法", "接口", "URL", "HTTP", "断言", "状态", "耗时(ms)", "错误信息"];
+        header.forEach((text, i) => {
+          pdf.text(text, colX[i] + 1.5, cursorY + 5.5, { maxWidth: widths[i] - 2 });
+        });
+        cursorY += headerH;
+      };
+
+      const truncate = (text: string, width: number): string => {
+        const max = Math.max(1, Math.floor(width / 1.2));
+        return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+      };
+
+      const drawRow = (item: ApiCollectionRun["items"][number], index: number) => {
+        const cells = [
+          String(index + 1),
+          item.method || "",
+          truncate(item.caseName || "", widths[2]),
+          truncate(item.url || "", widths[3]),
+          item.statusCode != null ? String(item.statusCode) : "",
+          `${item.assertionPassed}/${item.assertionTotal}`,
+          item.status === "success" ? "通过" : item.status === "failed" ? "失败" : item.status,
+          String(item.duration ?? ""),
+          truncate(item.errorMessage || (item.status === "failed" ? `断言失败（HTTP ${item.statusCode ?? "-"}）` : ""), widths[8]),
+        ];
+        // 行高按错误信息换行数自适应，避免文字溢出
+        const errLines = Math.ceil((item.errorMessage?.length || 0) / Math.max(1, Math.floor(widths[8] / 1.2)));
+        const lineCount = Math.max(1, Math.min(errLines, 2));
+        const h = rowH * lineCount;
+        if (cursorY + h > pageH - margin) {
+          pdf.addPage();
+          cursorY = margin;
+          drawHeader();
+        }
+        const y = cursorY;
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(margin, y, contentW, h, "F");
+        pdf.setDrawColor(235, 235, 235);
+        pdf.rect(margin, y, contentW, h, "S");
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(30, 30, 30);
+        cells.forEach((text, i) => {
+          pdf.text(text, colX[i] + 1.5, y + 4.5, { maxWidth: widths[i] - 2 });
+        });
+        cursorY = y + h;
+      };
+
+      // 报告标题
+      pdf.setFontSize(13);
+      pdf.setTextColor(20, 20, 20);
+      pdf.text(`${run.collectionName || run.collectionPath}`, margin, 18);
+      pdf.setFontSize(8);
+      pdf.setTextColor(120, 120, 120);
+      const trigger = run.triggerType === "schedule" ? "定时任务" : "手动执行";
+      const timeText = run.startedAt ? new Date(run.startedAt).toLocaleString("zh-CN", { hour12: false }) : "";
+      pdf.text(`${trigger} · ${timeText} · 通过 ${run.passed}/${run.total} · 失败 ${run.failed}`, margin, 24);
+      drawHeader();
+
+      run.items.forEach((item, index) => drawRow(item, index));
       pdf.save(`${run.collectionName || run.collectionPath}-${run.id}.pdf`);
     } finally {
       setPdfExporting(false);
@@ -159,17 +202,22 @@ export default function Reports() {
 
   const downloadExcelReport = (run: ApiCollectionRun) => {
     // 接口明细导出为 xlsx：序号/方法/接口/URL/HTTP/断言/状态/耗时/错误
-    const rows = run.items.map((item, index) => ({
-      "序号": index + 1,
-      "方法": item.method,
-      "接口": item.caseName,
-      "URL": item.url,
-      "HTTP": item.statusCode ?? "",
-      "断言": `${item.assertionPassed}/${item.assertionTotal}`,
-      "状态": item.status === "success" ? "通过" : item.status === "failed" ? "失败" : item.status,
-      "耗时(ms)": item.duration,
-      "错误信息": item.errorMessage || "",
-    }));
+    // 历史数据的 items 可能未落 errorMessage（旧执行），失败项回退为通用断言失败提示
+    const rows = run.items.map((item, index) => {
+      const error = item.errorMessage
+        || (item.status === "failed" ? `断言失败（HTTP ${item.statusCode ?? "-"}）` : "");
+      return {
+        "序号": index + 1,
+        "方法": item.method,
+        "接口": item.caseName,
+        "URL": item.url,
+        "HTTP": item.statusCode ?? "",
+        "断言": `${item.assertionPassed}/${item.assertionTotal}`,
+        "状态": item.status === "success" ? "通过" : item.status === "failed" ? "失败" : item.status,
+        "耗时(ms)": item.duration,
+        "错误信息": error,
+      };
+    });
     const header = ["序号", "方法", "接口", "URL", "HTTP", "断言", "状态", "耗时(ms)", "错误信息"];
     const worksheet = XLSX.utils.json_to_sheet(rows, { header });
     worksheet["!cols"] = [
@@ -233,10 +281,10 @@ export default function Reports() {
 
       {selectedRun && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="接口集合报告详情">
-          <div ref={reportRef} data-report-card className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-border bg-bg-card shadow-2xl">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-border bg-bg-card shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-border/60 px-4 py-3"><div><div className="mb-1 flex items-center gap-2"><h2 className="text-sm font-semibold">{selectedRun.collectionPath}</h2><StatusBadge status={selectedRun.status} size="sm" /></div><p className="text-[11px] text-text-tertiary">{formatDateTime(selectedRun.startedAt)} · {selectedRun.triggerType === "schedule" ? "定时任务" : "手动执行"} · {durationText(selectedRun.duration)}</p></div><div className="flex gap-1"><button onClick={() => downloadExcelReport(selectedRun)} className="flex h-8 w-8 items-center justify-center rounded text-text-secondary hover:bg-bg-elevated" title="导出 Excel"><FileSpreadsheet className="h-4 w-4" /></button><button onClick={() => void downloadAllureReport(selectedRun)} disabled={allureExporting} className="flex h-8 w-8 items-center justify-center rounded text-text-secondary hover:bg-bg-elevated disabled:opacity-40" title="导出 Allure 报告">{allureExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileJson className="h-4 w-4" />}</button><button onClick={() => void downloadApiReport(selectedRun)} disabled={pdfExporting} className="flex h-8 w-8 items-center justify-center rounded text-text-secondary hover:bg-bg-elevated disabled:opacity-40" title="导出 PDF 报告">{pdfExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}</button><button onClick={() => setSelectedRun(null)} className="flex h-8 w-8 items-center justify-center rounded text-text-secondary hover:bg-bg-elevated" title="关闭"><X className="h-4 w-4" /></button></div></div>
             <div className="grid grid-cols-3 border-b border-border/50"><div className="px-4 py-3"><div className="text-[11px] text-text-tertiary">接口总数</div><div className="mt-1 text-lg font-semibold">{selectedRun.total}</div></div><div className="border-l border-border/40 px-4 py-3"><div className="text-[11px] text-text-tertiary">通过</div><div className="mt-1 text-lg font-semibold text-success">{selectedRun.passed}</div></div><div className="border-l border-border/40 px-4 py-3"><div className="text-[11px] text-text-tertiary">失败</div><div className="mt-1 text-lg font-semibold text-danger">{selectedRun.failed}</div></div></div>
-            <div data-report-body className="min-h-0 flex-1 overflow-auto"><div className="min-w-[780px]"><div className="grid grid-cols-[48px_90px_minmax(180px,1fr)_90px_100px_100px] border-b border-border/50 bg-bg-elevated/40 text-[11px] text-text-tertiary"><span className="px-3 py-2">序号</span><span className="px-3 py-2">方法</span><span className="px-3 py-2">接口</span><span className="px-3 py-2">HTTP</span><span className="px-3 py-2">断言</span><span className="px-3 py-2">耗时</span></div>{selectedRun.items.map((item, index) => <div key={item.id} className="grid grid-cols-[48px_90px_minmax(180px,1fr)_90px_100px_100px] border-b border-border/30 text-xs"><span className="px-3 py-3 text-text-tertiary">{index + 1}</span><span className="px-3 py-3 font-semibold text-accent">{item.method}</span><div className="min-w-0 px-3 py-3"><div className="truncate font-medium">{item.caseName}</div><div className="mt-1 truncate font-mono text-[10px] text-text-tertiary">{item.url}</div>{item.errorMessage && <div className="mt-1 break-words text-[11px] text-danger">{item.errorMessage}</div>}</div><span className={`px-3 py-3 ${item.status === "success" ? "text-success" : "text-danger"}`}>{item.statusCode || item.status}</span><span className="px-3 py-3 text-text-secondary">{item.assertionPassed}/{item.assertionTotal}</span><span className="px-3 py-3 text-text-secondary"><Clock className="mr-1 inline h-3 w-3" />{durationText(item.duration)}</span></div>)}{selectedRun.items.length === 0 && <div className="py-12 text-center text-xs text-text-tertiary">{selectedRun.status === "running" ? "集合正在执行，请稍后刷新报告" : "没有执行明细"}</div>}</div></div>
+            <div className="min-h-0 flex-1 overflow-auto"><div className="min-w-[780px]"><div className="grid grid-cols-[48px_90px_minmax(180px,1fr)_90px_100px_100px] border-b border-border/50 bg-bg-elevated/40 text-[11px] text-text-tertiary"><span className="px-3 py-2">序号</span><span className="px-3 py-2">方法</span><span className="px-3 py-2">接口</span><span className="px-3 py-2">HTTP</span><span className="px-3 py-2">断言</span><span className="px-3 py-2">耗时</span></div>{selectedRun.items.map((item, index) => <div key={item.id} className="grid grid-cols-[48px_90px_minmax(180px,1fr)_90px_100px_100px] border-b border-border/30 text-xs"><span className="px-3 py-3 text-text-tertiary">{index + 1}</span><span className="px-3 py-3 font-semibold text-accent">{item.method}</span><div className="min-w-0 px-3 py-3"><div className="truncate font-medium">{item.caseName}</div><div className="mt-1 truncate font-mono text-[10px] text-text-tertiary">{item.url}</div>{item.errorMessage && <div className="mt-1 break-words text-[11px] text-danger">{item.errorMessage}</div>}</div><span className={`px-3 py-3 ${item.status === "success" ? "text-success" : "text-danger"}`}>{item.statusCode || item.status}</span><span className="px-3 py-3 text-text-secondary">{item.assertionPassed}/{item.assertionTotal}</span><span className="px-3 py-3 text-text-secondary"><Clock className="mr-1 inline h-3 w-3" />{durationText(item.duration)}</span></div>)}{selectedRun.items.length === 0 && <div className="py-12 text-center text-xs text-text-tertiary">{selectedRun.status === "running" ? "集合正在执行，请稍后刷新报告" : "没有执行明细"}</div>}</div></div>
           </div>
         </div>
       )}

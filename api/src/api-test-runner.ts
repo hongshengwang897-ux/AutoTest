@@ -237,6 +237,12 @@ export async function runApiTest(definition: ApiTestDefinition) {
 
     const status = assertionResults.every((item) => item.passed) ? "success" : "failed";
     const duration = Date.now() - startedAt;
+
+    // 断言失败时把失败原因写入 error_message，供集合报告 items / Allure / Excel 透传展示
+    const failedAssertions = assertionResults.filter((item) => !item.passed);
+    const assertionErrorMessage = failedAssertions.length > 0
+      ? failedAssertions.map((item) => `${item.source === "status" ? `状态码 ${response.status}` : `${item.source} ${item.target || ""}`} 期望 ${item.expected}，实际 ${item.actual}`).join("；")
+      : null;
     const row = {
       id: executionId,
       case_id: caseId,
@@ -252,7 +258,7 @@ export async function runApiTest(definition: ApiTestDefinition) {
       response_headers: JSON.stringify(responseHeaders),
       response_body: responseData.text,
       assertion_results: JSON.stringify(assertionResults),
-      error_message: null,
+      error_message: assertionErrorMessage,
       created_at: now(),
     };
     insert("api_executions", row);
